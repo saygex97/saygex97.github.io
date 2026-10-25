@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YT Subtitle · Voice Sync</title>
+  <style>
+    :root {
+      --bg-dark: #08080a;
+      --glass-bg: rgba(255, 255, 255, 0.07);
+      --glass-border: rgba(255, 255, 255, 0.14);
+      --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      --glass-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
+      --blur: 42px;
+      --radius-lg: 28px;
+      --radius-md: 16px;
+      --text-primary: rgba(255, 255, 255, 0.95);
+      --text-secondary: rgba(255, 255, 255, 0.6);
+      --accent: #0a84ff;
+      --accent-glow: rgba(10, 132, 255, 0.35);
+      --success: #4eb88b;
+      --danger: #ff453a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-dark);
+      background-image:
+        radial-gradient(circle at 15% 15%, rgba(10, 132, 255, 0.18) 0%, transparent 45%),
+        radial-gradient(circle at 85% 85%, rgba(140, 90, 200, 0.18) 0%, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(78, 184, 139, 0.09) 0%, transparent 60%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 28px 16px;
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0;
+    }
+
+    .app-container {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 820px;
+    }
+    .app-container::before {
+      content: '';
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80%; height: 80%;
+      background: radial-gradient(circle, rgba(10, 132, 255, 0.12) 0%, transparent 70%);
+      filter: blur(70px); z-index: -1; pointer-events: none;
+    }
+
+    .glass-card {
+      position: relative;
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--blur)) saturate(140%);
+      -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--glass-shadow), var(--glass-highlight), inset 0 -1px 0 rgba(0,0,0,0.25);
+      padding: 28px;
+      overflow: hidden;
+    }
+    .glass-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+    }
+
+    h1 {
+      font-size: 26px; font-weight: 700; letter-spacing: -0.5px;
+      margin-bottom: 6px;
+      background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.65) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 22px; }
+
+    .input-group { display: flex; gap: 10px; margin-bottom: 12px; }
+    input[type="text"] {
+      flex: 1;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: 13px 16px;
+      color: var(--text-primary);
+      font-size: 14px; outline: none;
+      backdrop-filter: blur(10px);
+      transition: border-color .2s, box-shadow .2s;
+    }
+    input[type="text"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    input[type="text"]::placeholder { color: rgba(255,255,255,0.35); }
+
+    .glass-btn {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: 13px 22px;
+      color: var(--text-primary);
+      font-size: 14px; font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all .18s cubic-bezier(.25,.1,.25,1);
+    }
+    .glass-btn:hover { background: rgba(255,255,255,0.18); transform: translateY(-1px); }
+    .glass-btn:active { transform: scale(0.97); }
+    .glass-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .glass-btn.primary {
+      background: var(--accent); border-color: transparent;
+      box-shadow: 0 4px 18px var(--accent-glow);
+    }
+    .glass-btn.primary:hover { background: #0a7ae0; }
+    .glass-btn.active { background: var(--accent); box-shadow: 0 4px 18px var(--accent-glow); }
+
+    .status {
+      font-size: 13px; color: var(--text-secondary);
+      min-height: 18px; margin-bottom: 12px;
+      transition: color .3s;
+    }
+    .status.error { color: var(--danger); }
+    .status.success { color: var(--success); }
+
+    /* ============ VIDEO + OVERLAY ============ */
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin-bottom: 14px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05);
+      display: none;
+    }
+    .video-wrapper #player,
+    .video-wrapper iframe {
+      position: absolute !important;
+      top: 0; left: 0;
+      width: 100% !important;
+      height: 100% !important;
+      border: none;
+    }
+    #subtitleOverlay {
+      position: absolute;
+      bottom: 11%;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: 88%;
+      padding: 8px 18px;
+      background: rgba(0, 0, 0, 0.68);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: #fff;
+      font-size: clamp(13px, 2vw, 19px);
+      font-weight: 600;
+      text-align: center;
+      line-height: 1.35;
+      border-radius: 10px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity .18s;
+    }
+    #subtitleOverlay.visible { opacity: 1; }
+
+    /* ============ SETTINGS PANEL ============ */
+    .glass-panel {
+      background: rgba(255,255,255,0.045);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      margin-top: 12px;
+    }
+    #settingsPanel {
+      display: none;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: flex-end;
+    }
+    .control-item {
+      display: flex; flex-direction: column; gap: 5px;
+      flex: 1 1 150px; min-width: 130px;
+    }
+    .control-item label {
+      font-size: 11px; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.6px;
+      font-weight: 600;
+    }
+    select {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      padding: 9px 12px;
+      color: var(--text-primary);
+      font-size: 13px; outline: none; cursor: pointer;
+      backdrop-filter: blur(10px);
+      max-width: 100%;
+    }
+    select option { background: #1a1a1c; color: #fff; }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 4px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 2px; outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px;
+      background: var(--accent); border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+    #rateValue {
+      font-size: 12px; color: var(--text-secondary); text-align: center;
+    }
+
+    /* ============ TRANSCRIPT ============ */
+    #transcriptContainer { display: none; max-height: 240px; overflow-y: auto; }
+    .transcript-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px;
+      font-size: 11px; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600;
+    }
+    .lang-badge {
+      background: rgba(10,132,255,0.22);
+      color: #64b5f6;
+      padding: 2px 10px; border-radius: 20px;
+      font-size: 10px; font-weight: 700;
+    }
+    .transcript-text {
+      font-size: 14px; line-height: 1.65;
+      color: var(--text-secondary);
+    }
+    .transcript-text .line {
+      display: block; margin-bottom: 2px;
+      cursor: pointer; padding: 2px 4px; border-radius: 4px;
+      transition: background .15s, color .15s;
+    }
+    .transcript-text .line:hover { background: rgba(255,255,255,0.06); color: #fff; }
+    .transcript-text .line.active {
+      background: rgba(10,132,255,0.2); color: #fff;
+    }
+    #transcriptContainer::-webkit-scrollbar { width: 6px; }
+    #transcriptContainer::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.15); border-radius: 3px;
+    }
+
+    @media (max-width: 640px) {
+      .glass-card { padding: 20px 16px; }
+      .input-group { flex-direction: column; }
+      h1 { font-size: 21px; }
+      #settingsPanel { gap: 10px; }
+      .control-item { flex: 1 1 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <div class="glass-card">
+      <h1>YT Subtitle · Voice Sync</h1>
+      <p class="subtitle">Xem video · phụ đề hiển thị trực tiếp · giọng đọc đồng bộ như VietSub</p>
+
+      <div class="input-group">
+        <input type="text" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." />
+        <button id="fetchBtn" class="glass-btn primary">Tải video</button>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <div id="videoWrapper" class="video-wrapper">
+        <div id="player"></div>
+        <div id="subtitleOverlay"></div>
+      </div>
+
+      <div id="settingsPanel" class="glass-panel">
+        <div class="control-item">
+          <label for="langSelect">Ngôn ngữ phụ đề</label>
+          <select id="langSelect"></select>
+        </div>
+        <div class="control-item">
+          <label for="voiceSelect">Giọng đọc</label>
+          <select id="voiceSelect"></select>
+        </div>
+        <div class="control-item">
+          <label for="rateSlider">Tốc độ đọc</label>
+          <input type="range" id="rateSlider" min="0.5" max="2" step="0.1" value="1" />
+          <span id="rateValue">1.0x</span>
+        </div>
+        <button id="speakToggle" class="glass-btn active" style="flex: 0 0 auto;">
+          🔊 Đọc
+        </button>
+      </div>
+
+      <div id="transcriptContainer" class="glass-panel" style="display:none;">
+        <div class="transcript-header">
+          <span>Phụ đề</span>
+          <span id="transcriptLang" class="lang-badge"></span>
+        </div>
+        <div id="transcriptText" class="transcript-text"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    /* ======================= STATE ======================= */
+    let player = null;
+    let ytApiReady = false;
+    let videoId = null;
+    let captionTracks = [];
+    let subtitles = [];
+    let currentSubtitleIdx = -1;
+    let pollInterval = null;
+    let autoSpeak = true;
+    let voices = [];
+
+    /* ======================= DOM ======================= */
+    const $ = id => document.getElementById(id);
+    const youtubeUrlInput = $('youtubeUrl');
+    const fetchBtn = $('fetchBtn');
+    const statusEl = $('status');
+    const videoWrapper = $('videoWrapper');
+    const subtitleOverlay = $('subtitleOverlay');
+    const settingsPanel = $('settingsPanel');
+    const langSelect = $('langSelect');
+    const voiceSelect = $('voiceSelect');
+    const rateSlider = $('rateSlider');
+    const rateValue = $('rateValue');
+    const speakToggle = $('speakToggle');
+    const transcriptContainer = $('transcriptContainer');
+    const transcriptText = $('transcriptText');
+    const transcriptLang = $('transcriptLang');
+
+    /* ======================= YT API READY ======================= */
+    window.onYouTubeIframeAPIReady = () => { ytApiReady = true; };
+
+    /* ======================= VOICES ======================= */
+    function populateVoices() {
+      voices = speechSynthesis.getVoices();
+      voiceSelect.innerHTML = '';
+      if (voices.length === 0) {
+        const o = document.createElement('option');
+        o.textContent = '(đang tải giọng...)';
+        voiceSelect.appendChild(o);
+        return;
+      }
+      voices.forEach((v, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = `${v.name} · ${v.lang}`;
+        voiceSelect.appendChild(opt);
+      });
+      const vi = voices.findIndex(v => v.lang.toLowerCase().startsWith('vi'));
+      if (vi !== -1) voiceSelect.value = vi;
+    }
+    speechSynthesis.onvoiceschanged = populateVoices;
+    populateVoices();
+
+    /* ======================= UI EVENTS ======================= */
+    rateSlider.addEventListener('input', () => {
+      rateValue.textContent = parseFloat(rateSlider.value).toFixed(1) + 'x';
+    });
+
+    speakToggle.addEventListener('click', () => {
+      autoSpeak = !autoSpeak;
+      speakToggle.classList.toggle('active', autoSpeak);
+      speakToggle.textContent = autoSpeak ? '🔊 Đọc' : '🔇 Tắt';
+      if (!autoSpeak) speechSynthesis.cancel();
+    });
+
+    langSelect.addEventListener('change', async (e) => {
+      try {
+        await loadTrack(parseInt(e.target.value));
+      } catch (err) {
+        setStatus('Lỗi tải phụ đề: ' + err.message, 'error');
+      }
+    });
+
+    /* ======================= HELPERS ======================= */
+    function setStatus(msg, type = '') {
+      statusEl.textContent = msg;
+      statusEl.className = 'status ' + type;
+    }
+
+    function getVideoId(url) {
+      const re = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
+      const m = url.match(re);
+      return m ? m[1] : null;
+    }
+
+    // Proxy fallback: thử lần lượt nhiều dịch vụ
+    async function fetchWithProxy(target) {
+      const proxies = [
+        'https://api.allorigins.win/raw?url=' + encodeURIComponent(target),
+        'https://corsproxy.io/?url=' + encodeURIComponent(target),
+        'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(target)
+      ];
+      let lastErr;
+      for (const p of proxies) {
+        try {
+          const res = await fetch(p);
+          if (res.ok) return res;
+          lastErr = new Error('Proxy trả về ' + res.status);
+        } catch (e) { lastErr = e; }
+      }
+      throw lastErr || new Error('Không kết nối được proxy');
+    }
+
+    /* ======================= LOAD VIDEO ======================= */
+    async function loadVideo() {
+      const url = youtubeUrlInput.value.trim();
+      if (!url) return setStatus('Vui lòng dán link YouTube.', 'error');
+
+      const vid = getVideoId(url);
+      if (!vid) return setStatus('Link YouTube không hợp lệ.', 'error');
+      if (!ytApiReady) return setStatus('YouTube API đang tải, thử lại sau 1-2 giây...', '');
+
+      fetchBtn.disabled = true;
+      fetchBtn.textContent = 'Đang tải...';
+      videoId = vid;
+      speechSynthesis.cancel();
+      stopSync();
+
+      try {
+        videoWrapper.style.display = 'block';
+
+        if (player && typeof player.loadVideoById === 'function') {
+          player.loadVideoById(videoId);
+        } else {
+          // ==== FIX LỖI 153: thêm origin ====
+          player = new YT.Player('player', {
+            videoId,
+            playerVars: {
+              cc_load_policy: 0,
+              rel: 0,
+              modestbranding: 1,
+              playsinline: 1,
+              origin: window.location.origin,
+              enablejsapi: 1
+            },
+            events: { onReady: onPlayerReady, onStateChange: onPlayerStateChange }
+          });
+        }
+
+        setStatus('Đang tải danh sách phụ đề...', '');
+        await fetchCaptionTracks(videoId);
+      } catch (err) {
+        console.error(err);
+        setStatus('Lỗi: ' + err.message, 'error');
+      } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.textContent = 'Tải video';
+      }
+    }
+
+    function onPlayerReady(event) {
+      const iframe = event.target.getIframe();
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.position = 'absolute';
+      iframe.style.top = '0';
+      iframe.style.left = '0';
+      iframe.style.border = 'none';
+      // ==== FIX LỖI 153: gửi Referer hợp lệ ====
+      iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+      iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
+      iframe.setAttribute('allowfullscreen', '');
+    }
+
+    function onPlayerStateChange(event) {
+      const S = YT.PlayerState;
+      if (event.data === S.PLAYING) {
+        if (speechSynthesis.paused) speechSynthesis.resume();
+        startSync();
+      } else if (event.data === S.PAUSED) {
+        speechSynthesis.pause();
+      } else if (event.data === S.ENDED) {
+        stopSync();
+        speechSynthesis.cancel();
+        subtitleOverlay.classList.remove('visible');
+        setStatus('Video đã kết thúc.', 'success');
+      } else if (event.data === S.BUFFERING) {
+        speechSynthesis.pause();
+      }
+    }
+
+    /* ======================= FETCH TRACKS ======================= */
+    async function fetchCaptionTracks(vid) {
+      const pageUrl = `https://www.youtube.com/watch?v=${vid}`;
+      const res = await fetchWithProxy(pageUrl);
+      const html = await res.text();
+
+      const patterns = [
+        /ytInitialPlayerResponse\s*=\s*({.+?});/,
+        /window\["ytInitialPlayerResponse"\]\s*=\s*({.+?});/,
+        /var ytInitialPlayerResponse\s*=\s*({.+?});/
+      ];
+      let playerResponse = null;
+      for (const p of patterns) {
+        const m = html.match(p);
+        if (m) { try { playerResponse = JSON.parse(m[1]); break; } catch {} }
+      }
+      if (!playerResponse) throw new Error('Không tìm thấy dữ liệu video.');
+      if (playerResponse.playabilityStatus?.status !== 'OK') {
+        throw new Error(playerResponse.playabilityStatus?.reason || 'Video không khả dụng.');
+      }
+
+      const tracks = playerResponse.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+      if (!tracks || !tracks.length) throw new Error('Video này không có phụ đề.');
+
+      captionTracks = tracks;
+
+      langSelect.innerHTML = '';
+      tracks.forEach((t, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        const name = t.name?.simpleText || t.name?.runs?.[0]?.text || t.languageCode;
+        opt.textContent = name + (t.kind === 'asr' ? ' (tự động)' : '');
+        langSelect.appendChild(opt);
+      });
+
+      settingsPanel.style.display = 'flex';
+      transcriptContainer.style.display = 'block';
+
+      await loadTrack(0);
+    }
+
+    /* ======================= LOAD 1 TRACK ======================= */
+    async function loadTrack(idx) {
+      const track = captionTracks[idx];
+      if (!track) return;
+
+      setStatus('Đang tải nội dung phụ đề...', '');
+      const captionUrl = track.baseUrl + '&fmt=json3';
+      const res = await fetchWithProxy(captionUrl);
+      const text = await res.text();
+
+      let data;
+      try { data = JSON.parse(text); }
+      catch { throw new Error('Định dạng phụ đề không hợp lệ.'); }
+
+      const events = data.events || [];
+      const raw = [];
+      for (const ev of events) {
+        if (!ev.segs) continue;
+        const t = ev.segs.map(s => s.utf8 || '').join('').replace(/\n/g, ' ').trim();
+        if (!t) continue;
+        const start = (ev.tStartMs || 0) / 1000;
+        const end = start + (ev.dDurationMs || 2000) / 1000;
+        raw.push({ start, end, text: t });
+      }
+
+      // Gộp caption tự động bị vụn
+      const merged = [];
+      let cur = null;
+      for (const s of raw) {
+        if (!cur) cur = { ...s };
+        else if (s.start - cur.end < 0.6 && cur.text.length < 110) {
+          cur.text += ' ' + s.text;
+          cur.end = s.end;
+        } else {
+          if (cur.text.trim()) merged.push(cur);
+          cur = { ...s };
+        }
+      }
+      if (cur && cur.text.trim()) merged.push(cur);
+
+      subtitles = merged;
+      currentSubtitleIdx = -1;
+      subtitleOverlay.classList.remove('visible');
+      subtitleOverlay.textContent = '';
+      speechSynthesis.cancel();
+
+      renderTranscriptList();
+      transcriptLang.textContent = track.name?.simpleText || track.languageCode;
+
+      setStatus(`Đã tải ${subtitles.length} dòng phụ đề · nhấn Play để bắt đầu.`, 'success');
+    }
+
+    /* ======================= TRANSCRIPT LIST ======================= */
+    function renderTranscriptList() {
+      transcriptText.innerHTML = '';
+      subtitles.forEach((s, i) => {
+        const div = document.createElement('div');
+        div.className = 'line';
+        div.dataset.idx = i;
+        div.textContent = s.text;
+        div.addEventListener('click', () => {
+          if (player && typeof player.seekTo === 'function') {
+            player.seekTo(s.start + 0.05, true);
+            if (typeof player.playVideo === 'function') player.playVideo();
+          }
+        });
+        transcriptText.appendChild(div);
+      });
+    }
+
+    /* ======================= SYNC LOOP ======================= */
+    function startSync() {
+      stopSync();
+      pollInterval = setInterval(syncTick, 90);
+    }
+    function stopSync() {
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    }
+
+    function syncTick() {
+      if (!player || typeof player.getCurrentTime !== 'function') return;
+      if (player.getPlayerState() !== YT.PlayerState.PLAYING) return;
+
+      const t = player.getCurrentTime();
+      let idx = -1;
+      for (let i = 0; i < subtitles.length; i++) {
+        if (t >= subtitles[i].start && t < subtitles[i].end) { idx = i; break; }
+      }
+
+      if (idx === currentSubtitleIdx) return;
+      currentSubtitleIdx = idx;
+
+      if (idx >= 0) {
+        subtitleOverlay.textContent = subtitles[idx].text;
+        subtitleOverlay.classList.add('visible');
+        highlightTranscriptLine(idx);
+        if (autoSpeak) speakSubtitle(subtitles[idx].text);
+      } else {
+        subtitleOverlay.classList.remove('visible');
+        highlightTranscriptLine(-1);
+      }
+    }
+
+    function highlightTranscriptLine(idx) {
+      const lines = transcriptText.children;
+      for (let i = 0; i < lines.length; i++) {
+        lines[i].classList.toggle('active', i === idx);
+      }
+      if (idx >= 0 && lines[idx]) {
+        lines[idx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+
+    /* ======================= SPEAK ======================= */
+    function speakSubtitle(text) {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      const vi = parseInt(voiceSelect.value, 10);
+      if (!isNaN(vi) && voices[vi]) u.voice = voices[vi];
+      u.rate = parseFloat(rateSlider.value);
+      speechSynthesis.speak(u);
+    }
+
+    /* ======================= BIND ======================= */
+    fetchBtn.addEventListener('click', loadVideo);
+    youtubeUrlInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') loadVideo();
+    });
+    window.addEventListener('beforeunload', () => {
+      speechSynthesis.cancel();
+      stopSync();
+    });
+  </script>
+</body>
+</html>
